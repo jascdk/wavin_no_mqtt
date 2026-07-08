@@ -5,9 +5,9 @@
 
 #include "WavinController.h"
 
-#ifndef TX_ENABLE_PIN
-#define TX_ENABLE_PIN 13
-#endif
+#define RX_PIN D5
+#define TX_PIN D6
+#define TX_ENABLE_PIN D7
 
 const char *WIFI_SSID = "ssid";
 const char *WIFI_PASSWORD = "pass";
@@ -267,12 +267,6 @@ void handleSetTemp() {
 }
 
 void setup() {
-  Serial.begin(115200);
-  delay(100);
-  Serial.println();
-  Serial.println(ESP.getResetReason());
-  Serial.printf("Free heap at boot: %u\n", ESP.getFreeHeap());
-
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) delay(500);
 
