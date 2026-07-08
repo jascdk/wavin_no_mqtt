@@ -143,7 +143,7 @@ void appendChannelCard(String &html, const ChannelData &data) {
 
   html += "<div class='card'><div class='row'><div><b id='name-" + channelId + "'>" + htmlEscape(data.name) + "</b><br><span id='temp-" + channelId + "'>" + String(data.temp, 1) + "°C</span>";
   html += "<div class='badges'><span class='badge " + getHeatBadgeClass(data.heating) + "' id='heat-" + channelId + "'>" + getHeatLabel(data.heating) + "</span>";
-  html += "<span class='badge badge-mode' id='mode-" + channelId + "'>" + getModeLabel(data.mode) + "</span></div>";
+  html += "<span class='badge badge-mode' id='mode-" + channelId + "' onclick='toggleMode(" + channelId + ")' style='cursor:pointer'>" + getModeLabel(data.mode) + "</span></div>";
   html += "<div class='battery'>Batteri: <span id='battery-" + channelId + "'>" + String(data.battery) + "%</span></div></div>";
   html += "<div class='controls'><button class='btn' onclick='adjust(" + channelId + ",-" + String(SETPOINT_STEP_TENTHS) + ")'>-</button>";
   html += "<span class='target' id='target-" + channelId + "' data-target-tenths='" + String((int)lroundf(data.target * 10.0f)) + "'>" + String(data.target, 1) + "°C</span>";
@@ -207,6 +207,7 @@ void handleRoot() {
   html += "var SETPOINT_DEBOUNCE_MS = " + String(SETPOINT_DEBOUNCE_MS) + ";";
   html += "var pendingSetpoints = {};";
   html += "var pendingSetpointTimers = {};";
+  html += "var pendingModes = {};";
   html += "function formatTemp(value) { return Number(value).toFixed(1) + '°C'; }";
   html += "function parseTempTenths(value) { var number = parseFloat(String(value).replace('°C', '')); return isNaN(number) ? 0 : Math.round(number * 10); }";
   html += "function clampTargetTenths(value) { if (value < SETPOINT_MIN_TENTHS) return SETPOINT_MIN_TENTHS; if (value > SETPOINT_MAX_TENTHS) return SETPOINT_MAX_TENTHS; return value; }";
@@ -220,11 +221,12 @@ void handleRoot() {
   html += "var standby = document.getElementById('standby-' + item.ch); if (standby) standby.textContent = formatTemp(item.standby);";
   html += "var battery = document.getElementById('battery-' + item.ch); if (battery) battery.textContent = item.battery + '%';";
   html += "updateBadge('heat-' + item.ch, item.heating ? '🔥 Varme' : 'Sluk', item.heating ? 'badge-heat' : 'badge-off');";
-  html += "var mode = document.getElementById('mode-' + item.ch); if (mode) mode.textContent = item.mode === 1 ? 'Standby' : 'Manuel';";
+  html += "var modeVal = item.mode; if (Object.prototype.hasOwnProperty.call(pendingModes, item.ch)) { if (modeVal === pendingModes[item.ch]) { delete pendingModes[item.ch]; } else { modeVal = pendingModes[item.ch]; } } var modeEl = document.getElementById('mode-' + item.ch); if (modeEl) modeEl.textContent = modeVal === 1 ? 'Standby' : 'Manuel';";
   html += "}); }).catch(function() {}); }";
   html += "function pushSetpoint(ch, tenths) { fetch('/set?ch=' + ch + '&val=' + (tenths / 10).toFixed(1)).then(function(response) { if (!response.ok) { throw new Error('setpoint'); } setTimeout(refreshData, 300); }).catch(function() { if (!pendingSetpointTimers[ch] && pendingSetpoints[ch] === tenths) { delete pendingSetpoints[ch]; refreshData(); } }); }";
   html += "function queueSetpointPush(ch) { if (pendingSetpointTimers[ch]) clearTimeout(pendingSetpointTimers[ch]); pendingSetpointTimers[ch] = setTimeout(function() { delete pendingSetpointTimers[ch]; if (!Object.prototype.hasOwnProperty.call(pendingSetpoints, ch)) return; pushSetpoint(ch, pendingSetpoints[ch]); }, SETPOINT_DEBOUNCE_MS); }";
   html += "function adjust(ch, deltaTenths) { var targetTenths = clampTargetTenths(getTargetTenths(ch) + deltaTenths); pendingSetpoints[ch] = targetTenths; setTargetValue(ch, targetTenths); queueSetpointPush(ch); }";
+  html += "function toggleMode(ch) { var modeEl = document.getElementById('mode-' + ch); var current = Object.prototype.hasOwnProperty.call(pendingModes, ch) ? pendingModes[ch] : (modeEl && modeEl.textContent === 'Standby' ? 1 : 0); var next = current === 1 ? 0 : 1; pendingModes[ch] = next; if (modeEl) modeEl.textContent = next === 1 ? 'Standby' : 'Manuel'; fetch('/setmode?ch=' + ch + '&mode=' + next).then(function(r) { if (!r.ok) { delete pendingModes[ch]; refreshData(); } else { setTimeout(refreshData, 300); } }).catch(function() { delete pendingModes[ch]; refreshData(); }); }";
   html += "setInterval(refreshData, 10000);";
   html += "</script></head><body><h1>Wavin Styring</h1>";
 
@@ -238,6 +240,33 @@ void handleRoot() {
   html += "<div class='footer'><b>System Info:</b><br>Model: AC-" + String(nameReg[0]) + " | HW: MC110" + String(hwReg[0]) + " | SW: MC610" + String(swReg[0] >> 4, HEX) + String(swReg[0] & 0x0F) + "</div>";
   html += "</body></html>";
   server.send(200, "text/html", html);
+}
+
+void handleSetMode() {
+  if (!server.hasArg("ch") || !server.hasArg("mode")) {
+    server.send(400, "text/plain", "Manglende parameter");
+    return;
+  }
+
+  int channel = server.arg("ch").toInt();
+  if (channel < 0 || channel >= WavinController::NUMBER_OF_CHANNELS) {
+    server.send(400, "text/plain", "Ugyldig kanal");
+    return;
+  }
+
+  int mode = server.arg("mode").toInt();
+  if (mode != WavinController::PACKED_DATA_CONFIGURATION_MODE_MANUAL &&
+      mode != WavinController::PACKED_DATA_CONFIGURATION_MODE_STANDBY) {
+    server.send(400, "text/plain", "Ugyldig tilstand");
+    return;
+  }
+
+  if (wavin.writeMaskedRegister(WavinController::CATEGORY_PACKED_DATA, channel, WavinController::PACKED_DATA_CONFIGURATION, (uint16_t)mode, WavinController::PACKED_DATA_CONFIGURATION_MODE_MASK)) {
+    server.send(200, "text/plain", "OK");
+    return;
+  }
+
+  server.send(500, "text/plain", "Fejl");
 }
 
 void handleSetTemp() {
@@ -271,6 +300,7 @@ void setup() {
   server.on("/", handleRoot);
   server.on("/data", handleData);
   server.on("/set", handleSetTemp);
+  server.on("/setmode", handleSetMode);
   server.begin();
 }
 
