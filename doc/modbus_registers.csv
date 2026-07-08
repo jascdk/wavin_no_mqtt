@@ -1,0 +1,28 @@
+category,page,register_hex,register_dec,name,access,type,scale,unit,function_codes,description,notes
+0x00,0,0x08,8,Status L (DHW enable bit),R/W,uint16,1,bitfield,"0x44|0x45",DHW enable control bit,"Set bit 13 = 1 to enable DHW"
+0x00,0,0x0E,14,DHW Temperature (current),R,int16,0.1,°C,0x43,Current domestic hot water temperature,Read-only
+0x00,0,0x0F,15,Inlet Temperature,R,int16,0.1,°C,0x43,Inlet water temperature,Read-only
+0x00,0,0x10-0x11,16-17,Total Power,R,uint32,1,raw,0x43,Total system power,"32-bit value across two registers"
+0x00,0,0x14,20,DHW Comfort Temperature,R/W,int16,0.1,°C,"0x43|0x44",Comfort target temperature,"Example: 550 = 55.0°C"
+0x00,0,0x15,21,DHW Eco Temperature,R/W,int16,0.1,°C,"0x43|0x44",Eco target temperature,
+0x00,0,0x16,22,DHW Cleaning Temperature,R/W,int16,0.1,°C,"0x43|0x44",Legionella prevention/cleaning setpoint,
+0x00,0,0x17,23,DHW Standby Temperature,R/W,int16,0.1,°C,"0x43|0x44",Standby/inactive setpoint,
+0x05,0,0x04,4,System Hour,R/W,uint16,1,hour,"0x43|0x44",Current hour,"Range 0-23"
+0x05,0,0x05,5,System Minute,R/W,uint16,1,minute,"0x43|0x44",Current minute,"Range 0-59"
+0x02,channel,0x00,0,Manual Temperature,R/W,int16,0.1,°C,"0x43|0x44",User-set manual target,"Page = Channel"
+0x02,channel,0x01,1,Comfort Temperature,R/W,int16,0.1,°C,"0x43|0x44",Occupied-mode target,"Page = Channel"
+0x02,channel,0x02,2,Eco Temperature,R/W,int16,0.1,°C,"0x43|0x44",Unoccupied-mode target,"Page = Channel"
+0x02,channel,0x03,3,Holiday Temperature,R/W,int16,0.1,°C,"0x43|0x44",Long absence setpoint,"Page = Channel"
+0x02,channel,0x04,4,Standby Temperature,R/W,int16,0.1,°C,"0x43|0x44",Minimal temperature,"Page = Channel"
+0x02,channel,0x05,5,Party Temperature,R/W,int16,0.1,°C,"0x43|0x44",Temporary boost target,"Page = Channel"
+0x02,channel,0x07,7,Configuration,R/W,uint16,1,bitfield,"0x43|0x44|0x45",Mode and schedule enable control,"Contains SCHED_ENA and MODE[2:0]"
+0x03,channel,0x00,0,Current Status,R,uint16,1,bitfield,0x43,Channel status flags including output/alarm,"Page = Channel"
+0x03,channel,0x01,1,Power Usage,R,uint16,0.54,mA,0x43,Channel power usage,"Documented as ×0.54 mA; Page = Channel"
+0x03,channel,0x02,2,Primary Element,R,uint16,1,index,0x43,Primary thermostat/sensor element index,"Page = Channel"
+0x06,channel-1,0x00,0,Schedule Header,R/W,uint16,1,raw,"0x43|0x44",Schedule identifier/header,"Page 0-16 maps Channel 1-17"
+0x06,channel-1,0x01-0x15,1-21,Schedule Data,R/W,bitfield_array,1,bits,"0x43|0x44",Weekly schedule data,"21 registers = 3/day × 7 days; 48 bits/day"
+0x01,element,0x04,4,Air Temperature,R,int16,0.1,°C,0x43,Current air temperature,"Page = Element Index; read-only"
+0x01,element,0x05,5,Floor Temperature,R,int16,0.1,°C,0x43,Current floor temperature,"Page = Element Index; read-only"
+0x01,element,0x08,8,Online Status,R,uint16,1,bitfield,0x43,Wireless device online status,"Bit 15 indicates online"
+0x01,element,0x09,9,Signal Strength,R,int16,1,RSSI,0x43,Wireless signal strength,"RSSI"
+0x01,element,0x0A,10,Battery Level,R,uint16,10,%,0x43,Battery level,"0-10 corresponds to 0-100%"
