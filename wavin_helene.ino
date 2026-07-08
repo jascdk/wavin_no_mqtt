@@ -143,38 +143,52 @@ void handleRoot() {
   wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 7, 6, hwReg);
   wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 8, 6, swReg);
 
-  String html;
-  html.reserve(14000);
-  html += "<html><head><meta charset='UTF-8'><title>Wavin Styring</title>";
-  html += "<style>";
-  html += "body{font-family:Arial;background:#f4f7fa;margin:0;padding:20px;color:#333}";
-  html += "h1{color:#005b96}";
-  html += ".channel-card{background:white;padding:15px;margin:10px 0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}";
-  html += ".channel-card.on{border-left:6px solid #28a745;background:#f0fff4}";
-  html += "form{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}";
-  html += "input,select,button{padding:6px;font-size:14px}";
-  html += "button{background:#007acc;color:white;border:none;border-radius:4px;cursor:pointer}";
-  html += "button:hover{background:#005f99}";
-  html += ".footer{margin-top:20px;font-size:12px;color:#555}";
-  html += "</style>";
-  html += "<script>";
-  html += "function refreshData(){fetch('/data').then(r=>r.json()).then(d=>console.log('updated',d));}";
-  html += "function setTemp(e,ch){e.preventDefault();const v=document.getElementById('temp'+ch).value;fetch('/set?ch='+ch+'&val='+v).then(r=>r.text()).then(alert);} ";
-  html += "function setMode(e,ch){e.preventDefault();const m=document.getElementById('mode'+ch).value;fetch('/setmode?ch='+ch+'&mode='+m).then(r=>r.text()).then(alert);} ";
-  html += "function setIntLock(e,ch){e.preventDefault();const l=document.getElementById('intlock'+ch).value;fetch('/setintlock?ch='+ch+'&lock='+l).then(r=>r.text()).then(alert);} ";
-  html += "setInterval(refreshData, 10000);";
-  html += "</script></head><body><h1>Wavin Styring</h1>";
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/html", "");
+
+  server.sendContent(F("<!doctype html><html><head><meta charset='UTF-8'><title>Wavin Styring</title>"));
+  server.sendContent(F("<style>"
+                       "body{font-family:Arial;background:#f4f7fa;margin:0;padding:20px;color:#333}"
+                       "h1{color:#005b96}"
+                       ".channel-card{background:white;padding:15px;margin:10px 0;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,0.1)}"
+                       ".channel-card.on{border-left:6px solid #28a745;background:#f0fff4}"
+                       "form{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}"
+                       "input,select,button{padding:6px;font-size:14px}"
+                       "button{background:#007acc;color:white;border:none;border-radius:4px;cursor:pointer}"
+                       "button:hover{background:#005f99}"
+                       ".footer{margin-top:20px;font-size:12px;color:#555}"
+                       "</style>"));
+  server.sendContent(F("<script>"
+                       "function refreshData(){fetch('/data').then(r=>r.json()).then(d=>console.log('updated',d));}"
+                       "function setTemp(e,ch){e.preventDefault();const v=document.getElementById('temp'+ch).value;fetch('/set?ch='+ch+'&val='+v).then(r=>r.text()).then(alert);}"
+                       "function setMode(e,ch){e.preventDefault();const m=document.getElementById('mode'+ch).value;fetch('/setmode?ch='+ch+'&mode='+m).then(r=>r.text()).then(alert);}"
+                       "function setIntLock(e,ch){e.preventDefault();const l=document.getElementById('intlock'+ch).value;fetch('/setintlock?ch='+ch+'&lock='+l).then(r=>r.text()).then(alert);}"
+                       "setInterval(refreshData,10000);"
+                       "</script></head><body><h1>Wavin Styring</h1>"));
 
   for (uint8_t ch = 0; ch < WavinController::NUMBER_OF_CHANNELS; ch++) {
     ChannelData data;
     if (readChannelData(ch, data) && data.active) {
-      appendChannelCard(html, data);
+      String card;
+      card.reserve(900);
+      appendChannelCard(card, data);
+      server.sendContent(card);
+      yield();
     }
   }
 
-  html += "<div class='footer'><b>System Info:</b><br>Model: AC-" + String(nameReg[0]) + " | HW: MC110" + String(hwReg[0]) + " | SW: MC610" + String(swReg[0] >> 4, HEX) + String(swReg[0] & 0x0F) + "</div>";
-  html += "</body></html>";
-  server.send(200, "text/html", html);
+  String footer;
+  footer.reserve(300);
+  footer += F("<div class='footer'><b>System Info:</b><br>Model: AC-");
+  footer += String(nameReg[0]);
+  footer += F(" | HW: MC110");
+  footer += String(hwReg[0]);
+  footer += F(" | SW: MC610");
+  footer += String(swReg[0] >> 4, HEX);
+  footer += String(swReg[0] & 0x0F);
+  footer += F("</div></body></html>");
+  server.sendContent(footer);
+  server.sendContent("");
 }
 
 void handleSetMode() {
@@ -253,6 +267,12 @@ void handleSetTemp() {
 }
 
 void setup() {
+  Serial.begin(115200);
+  delay(100);
+  Serial.println();
+  Serial.println(ESP.getResetReason());
+  Serial.printf("Free heap at boot: %u\n", ESP.getFreeHeap());
+
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) delay(500);
 
