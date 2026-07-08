@@ -8,6 +8,12 @@
 // OTA hostname (optional)
 #define OTA_HOSTNAME  "wavin-controller"
 
+// Optional setpoint tuning
+#define SETPOINT_STEP_TENTHS 5
+#define SETPOINT_MIN_TENTHS 50
+#define SETPOINT_MAX_TENTHS 350
+#define SETPOINT_DEBOUNCE_MS 800
+
 // Channel names — set to "" to use default "Kanal N"
 const char* CHANNEL_NAMES[16] = {
   "Stue",        // ch 0
