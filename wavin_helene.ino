@@ -84,7 +84,7 @@ bool readChannelData(uint8_t ch, ChannelData &data) {
 void appendChannelCard(String &html, const ChannelData &data) {
   String cardClass = data.outputOn ? "channel-card on" : "channel-card";
   html += "<div class='" + cardClass + "'>";
-  html += "<h3>Kanal " + String(data.channel + 1) + "</h3>";
+  html += "<h3>Kanal " + String(data.channel + 1) + " " + (data.intLock ? String("🔒") : String("🔓")) + "</h3>";
   html += "<p><b>Luft:</b> " + (isnan(data.airTemp) ? String("N/A") : String(data.airTemp, 1) + " \u00B0C") + "</p>";
   html += "<p><b>Gulv:</b> " + (isnan(data.floorTemp) ? String("N/A") : String(data.floorTemp, 1) + " \u00B0C") + "</p>";
   html += "<p><b>Setpoint:</b> " + String(data.manualTemp, 1) + " \u00B0C</p>";
