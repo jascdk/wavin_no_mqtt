@@ -1,0 +1,31 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// WiFi
+#define WIFI_SSID     "YourSSID"
+#define WIFI_PASSWORD "YourPassword"
+
+// OTA hostname (optional)
+#define OTA_HOSTNAME  "wavin-controller"
+
+// Channel names — set to "" to use default "Kanal N"
+const char* CHANNEL_NAMES[16] = {
+  "Stue",        // ch 0
+  "Køkken",      // ch 1
+  "Soveværelse", // ch 2
+  "Badeværelse", // ch 3
+  "",            // ch 4
+  "",            // ch 5
+  "",            // ch 6
+  "",            // ch 7
+  "",            // ch 8
+  "",            // ch 9
+  "",            // ch 10
+  "",            // ch 11
+  "",            // ch 12
+  "",            // ch 13
+  "",            // ch 14
+  ""             // ch 15
+};
+
+#endif
