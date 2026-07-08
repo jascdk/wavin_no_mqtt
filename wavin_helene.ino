@@ -5,9 +5,9 @@
 
 #include "WavinController.h"
 
-#define RX_PIN D5
-#define TX_PIN D6
-#define TX_ENABLE_PIN D7
+#ifndef TX_ENABLE_PIN
+#define TX_ENABLE_PIN 13
+#endif
 
 const char *WIFI_SSID = "ssid";
 const char *WIFI_PASSWORD = "pass";
