@@ -15,7 +15,7 @@ category,page,register_hex,register_dec,name,access,type,scale,unit,function_cod
 0x02,channel,0x03,3,Holiday Temperature,R/W,int16,0.1,°C,"0x43|0x44",Long absence setpoint,"Page = Channel"
 0x02,channel,0x04,4,Standby Temperature,R/W,int16,0.1,°C,"0x43|0x44",Minimal temperature,"Page = Channel"
 0x02,channel,0x05,5,Party Temperature,R/W,int16,0.1,°C,"0x43|0x44",Temporary boost target,"Page = Channel"
-0x02,channel,0x07,7,Configuration,R/W,uint16,1,bitfield,"0x43|0x44|0x45",Mode and schedule enable control,"Contains SCHED_ENA and MODE[2:0]"
+0x02,channel,0x07,7,Configuration,R/W,uint16,1,bitfield,"0x43|0x44|0x45",Channel mode/schedule/lock configuration,"Contains FLOOR_ENA(bit14), COOL_MODE(bit13), ADAPT_MODE(bit12), INT_LOCK(bit11), CTRL_LOCK(bit10), HOTEL_MODE(bit9), SCHED_ENA(bit3), MODE[2:0]"
 0x03,channel,0x00,0,Current Status,R,uint16,1,bitfield,0x43,Channel status flags including output/alarm,"Page = Channel"
 0x03,channel,0x01,1,Power Usage,R,uint16,0.54,mA,0x43,Channel power usage,"Documented as ×0.54 mA; Page = Channel"
 0x03,channel,0x02,2,Primary Element,R,uint16,1,index,0x43,Primary thermostat/sensor element index,"Page = Channel"

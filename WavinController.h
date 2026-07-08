@@ -25,9 +25,10 @@ class WavinController
     static const uint8_t PACKED_DATA_MANUAL_TEMPERATURE = 0x00;
     static const uint8_t PACKED_DATA_STANDBY_TEMPERATURE = 0x04;
     static const uint8_t PACKED_DATA_CONFIGURATION = 0x07;
-    static const uint8_t PACKED_DATA_CONFIGURATION_MODE_MASK = 0x07;
-    static const uint8_t PACKED_DATA_CONFIGURATION_MODE_MANUAL = 0x00;
-    static const uint8_t PACKED_DATA_CONFIGURATION_MODE_STANDBY = 0x01;
+    static const uint16_t PACKED_DATA_CONFIGURATION_MODE_MASK = 0x0007;
+    static const uint16_t PACKED_DATA_CONFIGURATION_MODE_MANUAL = 0x0000;
+    static const uint16_t PACKED_DATA_CONFIGURATION_MODE_STANDBY = 0x0001;
+    static const uint16_t PACKED_DATA_CONFIGURATION_INT_LOCK_MASK = 0x0800;
 
     static const uint8_t  NUMBER_OF_CHANNELS = 16;
     static const uint8_t  CHANNELS_TIMER_EVENT = 0x00;
