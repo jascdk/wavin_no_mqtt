@@ -1,6 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoOTA.h>
+#include <math.h>
 #include "WavinController.h"
 
 #if __has_include("config.h")
@@ -11,6 +12,22 @@
 
 ESP8266WebServer server(80);
 WavinController wavin(0, false, 1000);
+
+#ifndef SETPOINT_STEP_TENTHS
+#define SETPOINT_STEP_TENTHS 5
+#endif
+
+#ifndef SETPOINT_MIN_TENTHS
+#define SETPOINT_MIN_TENTHS 50
+#endif
+
+#ifndef SETPOINT_MAX_TENTHS
+#define SETPOINT_MAX_TENTHS 350
+#endif
+
+#ifndef SETPOINT_DEBOUNCE_MS
+#define SETPOINT_DEBOUNCE_MS 800
+#endif
 
 struct ChannelData {
   uint8_t ch;
@@ -70,6 +87,18 @@ String getHeatBadgeClass(bool heating) {
   return heating ? "badge-heat" : "badge-off";
 }
 
+int clampSetpointTenths(int value) {
+  if (value < SETPOINT_MIN_TENTHS) {
+    return SETPOINT_MIN_TENTHS;
+  }
+
+  if (value > SETPOINT_MAX_TENTHS) {
+    return SETPOINT_MAX_TENTHS;
+  }
+
+  return value;
+}
+
 bool readChannelData(uint8_t ch, ChannelData &data) {
   uint16_t primaryReg[1];
   data.active = false;
@@ -116,9 +145,9 @@ void appendChannelCard(String &html, const ChannelData &data) {
   html += "<div class='badges'><span class='badge " + getHeatBadgeClass(data.heating) + "' id='heat-" + channelId + "'>" + getHeatLabel(data.heating) + "</span>";
   html += "<span class='badge badge-mode' id='mode-" + channelId + "'>" + getModeLabel(data.mode) + "</span></div>";
   html += "<div class='battery'>Batteri: <span id='battery-" + channelId + "'>" + String(data.battery) + "%</span></div></div>";
-  html += "<div class='controls'><button class='btn' onclick='adjust(" + channelId + ",-0.5)'>-</button>";
-  html += "<span class='target' id='target-" + channelId + "'>" + String(data.target, 1) + "°C</span>";
-  html += "<button class='btn' onclick='adjust(" + channelId + ",0.5)'>+</button>";
+  html += "<div class='controls'><button class='btn' onclick='adjust(" + channelId + ",-" + String(SETPOINT_STEP_TENTHS) + ")'>-</button>";
+  html += "<span class='target' id='target-" + channelId + "' data-target-tenths='" + String((int)lroundf(data.target * 10.0f)) + "'>" + String(data.target, 1) + "°C</span>";
+  html += "<button class='btn' onclick='adjust(" + channelId + "," + String(SETPOINT_STEP_TENTHS) + ")'>+</button>";
   html += "<div class='standby'>Standby: <span id='standby-" + channelId + "'>" + String(data.standby, 1) + "°C</span></div></div></div></div>";
 }
 
@@ -173,19 +202,29 @@ void handleRoot() {
   html += ".battery, .standby { font-size: 0.8em; color: #666; margin-top: 5px; }";
   html += ".footer { background: #dee2e6; padding: 15px; border-radius: 12px; font-size: 0.85em; color: #444; }";
   html += "</style><script>";
+  html += "var SETPOINT_MIN_TENTHS = " + String(SETPOINT_MIN_TENTHS) + ";";
+  html += "var SETPOINT_MAX_TENTHS = " + String(SETPOINT_MAX_TENTHS) + ";";
+  html += "var SETPOINT_DEBOUNCE_MS = " + String(SETPOINT_DEBOUNCE_MS) + ";";
+  html += "var pendingSetpoints = {};";
+  html += "var pendingSetpointTimers = {};";
   html += "function formatTemp(value) { return Number(value).toFixed(1) + '°C'; }";
-  html += "function getTargetValue(ch) { var el = document.getElementById('target-' + ch); return el ? parseFloat(el.textContent) : 0; }";
+  html += "function parseTempTenths(value) { var number = parseFloat(String(value).replace('°C', '')); return isNaN(number) ? 0 : Math.round(number * 10); }";
+  html += "function clampTargetTenths(value) { if (value < SETPOINT_MIN_TENTHS) return SETPOINT_MIN_TENTHS; if (value > SETPOINT_MAX_TENTHS) return SETPOINT_MAX_TENTHS; return value; }";
+  html += "function setTargetValue(ch, tenths) { var el = document.getElementById('target-' + ch); if (!el) return; el.textContent = formatTemp(tenths / 10); el.setAttribute('data-target-tenths', String(tenths)); }";
+  html += "function getTargetTenths(ch) { var el = document.getElementById('target-' + ch); if (!el) return 0; var value = parseInt(el.getAttribute('data-target-tenths'), 10); if (isNaN(value)) { value = parseTempTenths(el.textContent); el.setAttribute('data-target-tenths', String(value)); } return value; }";
   html += "function updateBadge(id, text, className) { var el = document.getElementById(id); if (!el) return; el.textContent = text; el.className = 'badge ' + className; }";
   html += "function refreshData() { fetch('/data').then(function(response) { return response.json(); }).then(function(items) { items.forEach(function(item) {";
   html += "var temp = document.getElementById('temp-' + item.ch); if (temp) temp.textContent = formatTemp(item.temp);";
   html += "var name = document.getElementById('name-' + item.ch); if (name) name.textContent = item.name;";
-  html += "var target = document.getElementById('target-' + item.ch); if (target) target.textContent = formatTemp(item.target);";
+  html += "var targetTenths = parseTempTenths(item.target); if (Object.prototype.hasOwnProperty.call(pendingSetpoints, item.ch)) { if (targetTenths === pendingSetpoints[item.ch] && !pendingSetpointTimers[item.ch]) { delete pendingSetpoints[item.ch]; } else { targetTenths = pendingSetpoints[item.ch]; } } setTargetValue(item.ch, targetTenths);";
   html += "var standby = document.getElementById('standby-' + item.ch); if (standby) standby.textContent = formatTemp(item.standby);";
   html += "var battery = document.getElementById('battery-' + item.ch); if (battery) battery.textContent = item.battery + '%';";
   html += "updateBadge('heat-' + item.ch, item.heating ? '🔥 Varme' : 'Sluk', item.heating ? 'badge-heat' : 'badge-off');";
   html += "var mode = document.getElementById('mode-' + item.ch); if (mode) mode.textContent = item.mode === 1 ? 'Standby' : 'Manuel';";
   html += "}); }).catch(function() {}); }";
-  html += "function adjust(ch, delta) { var val = (getTargetValue(ch) + delta).toFixed(1); fetch('/set?ch=' + ch + '&val=' + val).then(function() { setTimeout(refreshData, 300); }); }";
+  html += "function pushSetpoint(ch, tenths) { fetch('/set?ch=' + ch + '&val=' + (tenths / 10).toFixed(1)).then(function(response) { if (!response.ok) { throw new Error('setpoint'); } setTimeout(refreshData, 300); }).catch(function() { if (!pendingSetpointTimers[ch] && pendingSetpoints[ch] === tenths) { delete pendingSetpoints[ch]; refreshData(); } }); }";
+  html += "function queueSetpointPush(ch) { if (pendingSetpointTimers[ch]) clearTimeout(pendingSetpointTimers[ch]); pendingSetpointTimers[ch] = setTimeout(function() { delete pendingSetpointTimers[ch]; if (!Object.prototype.hasOwnProperty.call(pendingSetpoints, ch)) return; pushSetpoint(ch, pendingSetpoints[ch]); }, SETPOINT_DEBOUNCE_MS); }";
+  html += "function adjust(ch, deltaTenths) { var targetTenths = clampTargetTenths(getTargetTenths(ch) + deltaTenths); pendingSetpoints[ch] = targetTenths; setTargetValue(ch, targetTenths); queueSetpointPush(ch); }";
   html += "setInterval(refreshData, 10000);";
   html += "</script></head><body><h1>Wavin Styring</h1>";
 
@@ -213,7 +252,7 @@ void handleSetTemp() {
     return;
   }
 
-  int tempValue = (int)(server.arg("val").toFloat() * 10);
+  int tempValue = clampSetpointTenths((int)lroundf(server.arg("val").toFloat() * 10.0f));
   if (wavin.writeRegister(WavinController::CATEGORY_PACKED_DATA, channel, WavinController::PACKED_DATA_MANUAL_TEMPERATURE, tempValue)) {
     server.send(200, "text/plain", "OK");
     return;
