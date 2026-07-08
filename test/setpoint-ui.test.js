@@ -59,6 +59,7 @@ function createHarness() {
   let nextTimerId = 1;
   const fetchCalls = [];
   const refreshRequests = [];
+  const serverState = { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 1' };
   const target = createElement('21.0°C');
   target.setAttribute('data-target-tenths', '210');
   const elements = {
@@ -84,14 +85,14 @@ function createHarness() {
           json() {
             refreshRequests.push(url);
             return Promise.resolve([{
-              ch: 0,
-              temp: 20.0,
-              target: 21.0,
-              standby: 18.0,
-              battery: 90,
-              heating: false,
-              mode: 0,
-              name: 'Zone 1',
+              ch: serverState.ch,
+              temp: serverState.temp,
+              target: serverState.target,
+              standby: serverState.standby,
+              battery: serverState.battery,
+              heating: serverState.heating,
+              mode: serverState.mode,
+              name: serverState.name,
             }]);
           },
         });
@@ -133,6 +134,7 @@ function createHarness() {
     elements,
     fetchCalls,
     refreshRequests,
+    serverState,
     runActiveTimeouts(delay) {
       for (const [id, timer] of Array.from(timers.entries())) {
         if (!timer.cleared && timer.delay === delay) {
@@ -214,4 +216,67 @@ test('refreshData does not overwrite a pending local setpoint change', async () 
 
   assert.equal(harness.elements['target-0'].textContent, '21.5°C');
   assert.deepEqual(harness.fetchCalls, ['/data']);
+});
+
+test('toggleMode optimistically updates mode display to standby', async () => {
+  const harness = createHarness();
+
+  harness.context.toggleMode(0);
+
+  assert.equal(harness.elements['mode-0'].textContent, 'Standby');
+  assert.ok(harness.fetchCalls.some((u) => u === '/setmode?ch=0&mode=1'), 'should call /setmode with mode=1');
+});
+
+test('toggleMode switches standby back to manual', async () => {
+  const harness = createHarness();
+  harness.elements['mode-0'].textContent = 'Standby';
+
+  harness.context.toggleMode(0);
+
+  assert.equal(harness.elements['mode-0'].textContent, 'Manuel');
+  assert.ok(harness.fetchCalls.some((u) => u === '/setmode?ch=0&mode=0'), 'should call /setmode with mode=0');
+});
+
+test('refreshData does not overwrite a pending mode change to standby', async () => {
+  const harness = createHarness();
+
+  harness.context.toggleMode(0);
+  await flushPromises();
+
+  harness.context.refreshData();
+  await flushPromises();
+
+  assert.equal(harness.elements['mode-0'].textContent, 'Standby');
+});
+
+test('mode remains standby across multiple refresh cycles until device confirms', async () => {
+  const harness = createHarness();
+
+  harness.context.toggleMode(0);
+  await flushPromises();
+
+  for (let i = 0; i < 3; i++) {
+    harness.context.refreshData();
+    await flushPromises();
+    assert.equal(harness.elements['mode-0'].textContent, 'Standby', `refresh ${i + 1} should still show Standby`);
+  }
+});
+
+test('refreshData clears pending mode once device confirms standby', async () => {
+  const harness = createHarness();
+
+  harness.context.toggleMode(0);
+  await flushPromises();
+
+  // device now reports standby
+  harness.serverState.mode = 1;
+  harness.context.refreshData();
+  await flushPromises();
+
+  assert.equal(harness.elements['mode-0'].textContent, 'Standby');
+
+  // pending is cleared; further refreshes use device value directly
+  harness.context.refreshData();
+  await flushPromises();
+  assert.equal(harness.elements['mode-0'].textContent, 'Standby');
 });
