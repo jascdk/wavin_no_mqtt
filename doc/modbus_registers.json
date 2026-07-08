@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "system": "Wavin AHC 9000",
+    "protocol": "Modbus RTU over RS-485",
+    "source_files": [
+      "doc/modbus_doc.doc",
+      "Wavin Modbus beskrivelse for AHC 9000 styreenhed_14082013.pdf"
+    ],
+    "extraction_basis": "User-provided communication guide text",
+    "validation_status": "Needs verification against original vendor register map before production"
+  },
+  "encoding_rules": {
+    "temperature_scale": 0.1,
+    "temperature_unknown_value": "0x7FFF",
+    "bit_numbering": "bit0_lsb_bit15_msb",
+    "schedule": {
+      "slots_per_day": 48,
+      "minutes_per_slot": 30,
+      "comfort_bit": 1,
+      "eco_bit": 0,
+      "write_requirement": "write_full_page_22_registers"
+    }
+  },
+  "categories": [
+    {"id": "0x00", "name": "MAIN", "purpose": "Global system settings", "pages": 1},
+    {"id": "0x01", "name": "ELEMENTS", "purpose": "Thermostat/sensor data", "pages": 48},
+    {"id": "0x02", "name": "PACKED DATA", "purpose": "Room/zone settings", "pages": 17},
+    {"id": "0x03", "name": "CHANNELS", "purpose": "Channel status", "pages": 17},
+    {"id": "0x04", "name": "RELAYS", "purpose": "Relay control", "pages": 2},
+    {"id": "0x05", "name": "CLOCK", "purpose": "Date/time", "pages": 1},
+    {"id": "0x06", "name": "SCHEDULES", "purpose": "Weekly schedules", "pages": 17},
+    {"id": "0x07", "name": "INFO", "purpose": "System information", "pages": 1}
+  ],
+  "registers": [
+    {"category":"0x00","page":"0","register":"0x08","name":"Status L (DHW enable bit)","access":"R/W","type":"uint16","scale":1,"unit":"bitfield","function_codes":["0x44","0x45"],"description":"DHW enable control bit","notes":"Set bit 13 = 1 to enable DHW"},
+    {"category":"0x00","page":"0","register":"0x0E","name":"DHW Temperature (current)","access":"R","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43"],"description":"Current domestic hot water temperature","notes":"Read-only"},
+    {"category":"0x00","page":"0","register":"0x0F","name":"Inlet Temperature","access":"R","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43"],"description":"Inlet water temperature","notes":"Read-only"},
+    {"category":"0x00","page":"0","register":"0x10-0x11","name":"Total Power","access":"R","type":"uint32","scale":1,"unit":"raw","function_codes":["0x43"],"description":"Total system power","notes":"32-bit value across two registers"},
+    {"category":"0x00","page":"0","register":"0x14","name":"DHW Comfort Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Comfort target temperature","notes":"Example: 550 = 55.0°C"},
+    {"category":"0x00","page":"0","register":"0x15","name":"DHW Eco Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Eco target temperature","notes":""},
+    {"category":"0x00","page":"0","register":"0x16","name":"DHW Cleaning Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Legionella prevention/cleaning setpoint","notes":""},
+    {"category":"0x00","page":"0","register":"0x17","name":"DHW Standby Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Standby/inactive setpoint","notes":""},
+    {"category":"0x05","page":"0","register":"0x04","name":"System Hour","access":"R/W","type":"uint16","scale":1,"unit":"hour","function_codes":["0x43","0x44"],"description":"Current hour","notes":"Range 0-23"},
+    {"category":"0x05","page":"0","register":"0x05","name":"System Minute","access":"R/W","type":"uint16","scale":1,"unit":"minute","function_codes":["0x43","0x44"],"description":"Current minute","notes":"Range 0-59"},
+
+    {"category":"0x02","page":"channel","register":"0x00","name":"Manual Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"User-set manual target","notes":"Page = Channel"},
+    {"category":"0x02","page":"channel","register":"0x01","name":"Comfort Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Occupied-mode target","notes":"Page = Channel"},
+    {"category":"0x02","page":"channel","register":"0x02","name":"Eco Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Unoccupied-mode target","notes":"Page = Channel"},
+    {"category":"0x02","page":"channel","register":"0x03","name":"Holiday Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Long absence setpoint","notes":"Page = Channel"},
+    {"category":"0x02","page":"channel","register":"0x04","name":"Standby Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Minimal temperature","notes":"Page = Channel"},
+    {"category":"0x02","page":"channel","register":"0x05","name":"Party Temperature","access":"R/W","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43","0x44"],"description":"Temporary boost target","notes":"Page = Channel"},
+    {"category":"0x02","page":"channel","register":"0x07","name":"Configuration","access":"R/W","type":"uint16","scale":1,"unit":"bitfield","function_codes":["0x43","0x44","0x45"],"description":"Mode and schedule enable control","notes":"Contains SCHED_ENA and MODE[2:0]"},
+
+    {"category":"0x03","page":"channel","register":"0x00","name":"Current Status","access":"R","type":"uint16","scale":1,"unit":"bitfield","function_codes":["0x43"],"description":"Channel status flags incl. output/alarm","notes":"Page = Channel"},
+    {"category":"0x03","page":"channel","register":"0x01","name":"Power Usage","access":"R","type":"uint16","scale":0.54,"unit":"mA","function_codes":["0x43"],"description":"Channel power usage","notes":"Documented as ×0.54 mA; Page = Channel"},
+    {"category":"0x03","page":"channel","register":"0x02","name":"Primary Element","access":"R","type":"uint16","scale":1,"unit":"index","function_codes":["0x43"],"description":"Primary thermostat/sensor element index","notes":"Page = Channel"},
+
+    {"category":"0x06","page":"channel-1","register":"0x00","name":"Schedule Header","access":"R/W","type":"uint16","scale":1,"unit":"raw","function_codes":["0x43","0x44"],"description":"Schedule identifier/header","notes":"Page 0-16 maps Channel 1-17"},
+    {"category":"0x06","page":"channel-1","register":"0x01-0x15","name":"Schedule Data","access":"R/W","type":"bitfield_array","scale":1,"unit":"bits","function_codes":["0x43","0x44"],"description":"21 registers = 3/day × 7 days","notes":"48 bits/day, Comfort=1 Eco=0"},
+
+    {"category":"0x01","page":"element","register":"0x04","name":"Air Temperature","access":"R","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43"],"description":"Current air temperature","notes":"Page = Element Index; read-only"},
+    {"category":"0x01","page":"element","register":"0x05","name":"Floor Temperature","access":"R","type":"int16","scale":0.1,"unit":"°C","function_codes":["0x43"],"description":"Current floor temperature","notes":"Page = Element Index; read-only"},
+    {"category":"0x01","page":"element","register":"0x08","name":"Online Status","access":"R","type":"uint16","scale":1,"unit":"bitfield","function_codes":["0x43"],"description":"Device online status","notes":"Bit 15 indicates online"},
+    {"category":"0x01","page":"element","register":"0x09","name":"Signal Strength","access":"R","type":"int16","scale":1,"unit":"RSSI","function_codes":["0x43"],"description":"Wireless signal strength","notes":"RSSI value"},
+    {"category":"0x01","page":"element","register":"0x0A","name":"Battery Level","access":"R","type":"uint16","scale":10,"unit":"%","function_codes":["0x43"],"description":"Battery level","notes":"0-10 => 0-100%"}
+  ],
+  "mode_encoding": [
+    {"name":"Manual","sched_ena":0,"mode":"000","description":"Fixed manual temperature"},
+    {"name":"Permanent Standby","sched_ena":0,"mode":"001","description":"Always standby setpoint"},
+    {"name":"Permanent Eco","sched_ena":0,"mode":"010","description":"Always eco setpoint"},
+    {"name":"Permanent Comfort","sched_ena":0,"mode":"011","description":"Always comfort setpoint"},
+    {"name":"Party (Manual)","sched_ena":0,"mode":"100","description":"Manual + party boost"},
+    {"name":"Holiday (Manual)","sched_ena":0,"mode":"101","description":"Manual switched to holiday setpoint"},
+    {"name":"Week Schedule","sched_ena":1,"mode":"000","description":"Follow programmed weekly schedule"},
+    {"name":"Temporary Eco","sched_ena":1,"mode":"010","description":"Scheduled mode temporarily eco"},
+    {"name":"Temporary Comfort","sched_ena":1,"mode":"011","description":"Scheduled mode temporarily comfort"},
+    {"name":"Party (Schedule)","sched_ena":1,"mode":"100","description":"Schedule + party boost"},
+    {"name":"Holiday (Schedule)","sched_ena":1,"mode":"101","description":"Schedule switched to holiday"}
+  ],
+  "function_codes": [
+    {"code":"0x43","name":"Read Register from Index","purpose":"Read by category/page/index"},
+    {"code":"0x44","name":"Write Register to Index","purpose":"Write by category/page/index"},
+    {"code":"0x45","name":"Write Register Masked","purpose":"Write specific bits only"},
+    {"code":"0x41","name":"Read Register from Address","purpose":"Read by address model"},
+    {"code":"0x42","name":"Write Register from Address","purpose":"Write by address model"},
+    {"code":"0x6D","name":"Enumeration Commands","purpose":"Multi-unit setup/addressing"}
+  ]
+}
