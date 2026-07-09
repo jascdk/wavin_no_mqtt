@@ -38,9 +38,9 @@ class WavinController
     
   private:
     uint8_t txEnablePin;
-    uint16_t recieveTimeout_ms;
-    void transmit(uint8_t *data, uint8_t lenght);
-    bool recieve(uint16_t *reply, uint8_t cmdtype);
+    uint16_t receiveTimeout_ms;
+    void transmit(uint8_t *data, uint8_t length);
+    bool receive(uint16_t *reply, uint8_t cmdtype);
     unsigned int calculateCRC(unsigned char *frame, unsigned char bufferSize);
 
     const uint8_t MODBUS_DEVICE = 0x01;
@@ -49,5 +49,5 @@ class WavinController
     const uint8_t MODBUS_WRITE_MASKED_REGISTER = 0x45;
     
     // Largest page contains 22 registers of 2 bytes + 5 bytes header
-    const uint8_t RECIEVE_BUFFER_SIZE =  22 * 2 + 5;
+    const uint8_t RECEIVE_BUFFER_SIZE =  22 * 2 + 5;
 };
