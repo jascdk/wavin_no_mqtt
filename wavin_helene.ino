@@ -152,7 +152,9 @@ void appendChannelCard(String &html, const ChannelData &data) {
 }
 
 void handleData() {
-  String json = "[";
+  String json;
+  json.reserve(2048);
+  json = "[";
   bool first = true;
 
   for (uint8_t ch = 0; ch < WavinController::NUMBER_OF_CHANNELS; ch++) {
@@ -182,12 +184,14 @@ void handleData() {
 }
 
 void handleRoot() {
-  uint16_t hwReg[1], swReg[1], nameReg[1];
-  wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 0x02, 1, hwReg);
-  wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 0x03, 1, swReg);
-  wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 0x04, 1, nameReg);
+  uint16_t hwReg[1] = {0}, swReg[1] = {0}, nameReg[1] = {0};
+  bool hwOk   = wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 0x02, 1, hwReg);
+  bool swOk   = wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 0x03, 1, swReg);
+  bool nameOk = wavin.readRegisters(WavinController::CATEGORY_INFO, 0, 0x04, 1, nameReg);
 
-  String html = "<html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'><style>";
+  String html;
+  html.reserve(12000);
+  html = "<html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'><style>";
   html += "body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 15px; }";
   html += ".card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }";
   html += ".row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }";
@@ -237,7 +241,10 @@ void handleRoot() {
     }
   }
 
-  html += "<div class='footer'><b>System Info:</b><br>Model: AC-" + String(nameReg[0]) + " | HW: MC110" + String(hwReg[0]) + " | SW: MC610" + String(swReg[0] >> 4, HEX) + String(swReg[0] & 0x0F) + "</div>";
+  String sysModel = nameOk ? ("AC-" + String(nameReg[0])) : "N/A";
+  String sysHW    = hwOk   ? ("MC110" + String(hwReg[0])) : "N/A";
+  String sysSW    = swOk   ? ("MC610" + String(swReg[0] >> 4, HEX) + String(swReg[0] & 0x0F)) : "N/A";
+  html += "<div class='footer'><b>System Info:</b><br>Model: " + sysModel + " | HW: " + sysHW + " | SW: " + sysSW + "</div>";
   html += "</body></html>";
   server.send(200, "text/html", html);
 }

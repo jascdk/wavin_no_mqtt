@@ -15,7 +15,7 @@ WavinController::WavinController(uint8_t pin, bool swapSerialPins, uint16_t time
   digitalWrite(pin, LOW);
   pinMode(pin, OUTPUT);
 
-  recieveTimeout_ms = timeout_ms;
+  receiveTimeout_ms = timeout_ms;
 
   Serial.begin(38400);
 
@@ -49,15 +49,15 @@ unsigned int WavinController::calculateCRC(uint8_t *frame, uint8_t bufferSize)
 }
 
 
-bool WavinController::recieve(uint16_t *reply, uint8_t cmdtype)
+bool WavinController::receive(uint16_t *reply, uint8_t cmdtype)
 {
-  uint8_t buffer[RECIEVE_BUFFER_SIZE];
+  uint8_t buffer[RECEIVE_BUFFER_SIZE];
   uint8_t n = 0;
   unsigned long start_time = millis();
 
-  while (millis() - start_time < recieveTimeout_ms)
+  while (millis() - start_time < receiveTimeout_ms)
   {
-    while (Serial.available() && n<RECIEVE_BUFFER_SIZE)
+    while (Serial.available() && n < RECEIVE_BUFFER_SIZE)
     {
       buffer[n] = Serial.read();
       n++;
@@ -79,20 +79,21 @@ bool WavinController::recieve(uint16_t *reply, uint8_t cmdtype)
         return true;
       }
     }
+    yield();
   }
   return false;
 }
 
 
-void WavinController::transmit(uint8_t *data, uint8_t lenght)
+void WavinController::transmit(uint8_t *data, uint8_t length)
 {
-  // Empty recieve buffer before sending
-  while (Serial.read() != -1);
+  // Empty receive buffer before sending
+  while (Serial.available()) Serial.read();
 
   INT_LOCK();
   digitalWrite(txEnablePin, HIGH);
 
-  Serial.write(data, lenght);
+  Serial.write(data, length);
 
   Serial.flush(); // Wait for data to be sent
   delayMicroseconds(250); // Wait for last char to be transmitted
@@ -120,7 +121,7 @@ bool WavinController::readRegisters(uint8_t category, uint8_t page, uint8_t inde
 
   transmit(message, 8);
 
-  return recieve(reply, MODBUS_READ_REGISTER);
+  return receive(reply, MODBUS_READ_REGISTER);
 }
 
 
@@ -145,7 +146,7 @@ bool WavinController::writeRegister(uint8_t category, uint8_t page, uint8_t inde
   transmit(message, 10);
 
   uint16_t reply[1];
-  return recieve(reply, MODBUS_WRITE_REGISTER); // Recieve reply but ignore it. Asume it's ok
+  return receive(reply, MODBUS_WRITE_REGISTER); // Receive reply but ignore it. Assume it's ok
 }
 
 bool WavinController::writeMaskedRegister(uint8_t category, uint8_t page, uint8_t index, uint16_t value, uint16_t mask)
@@ -171,5 +172,5 @@ bool WavinController::writeMaskedRegister(uint8_t category, uint8_t page, uint8_
   transmit(message, 12);
 
   uint16_t reply[1];
-  return recieve(reply, MODBUS_WRITE_MASKED_REGISTER); // Recieve reply but ignore it. Asume it's ok
+  return receive(reply, MODBUS_WRITE_MASKED_REGISTER); // Receive reply but ignore it. Assume it's ok
 }
