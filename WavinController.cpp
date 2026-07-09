@@ -1,6 +1,13 @@
 #include <ESP8266WiFi.h>
 #include "WavinController.h"
 
+#ifndef INT_LOCK
+#define INT_LOCK() noInterrupts()
+#endif
+
+#ifndef INT_UNLOCK
+#define INT_UNLOCK() interrupts()
+#endif
 
 WavinController::WavinController(uint8_t pin, bool swapSerialPins, uint16_t timeout_ms)
 {
@@ -82,6 +89,7 @@ void WavinController::transmit(uint8_t *data, uint8_t lenght)
   // Empty recieve buffer before sending
   while (Serial.read() != -1);
 
+  INT_LOCK();
   digitalWrite(txEnablePin, HIGH);
 
   Serial.write(data, lenght);
@@ -90,6 +98,7 @@ void WavinController::transmit(uint8_t *data, uint8_t lenght)
   delayMicroseconds(250); // Wait for last char to be transmitted
 
   digitalWrite(txEnablePin, LOW);
+  INT_UNLOCK();
 }
 
 
