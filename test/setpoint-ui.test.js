@@ -29,7 +29,7 @@ function parseHtmlAppendLine(line) {
 function extractScript() {
   const startMarker = 'html += "</style><script>";';
   const start = source.indexOf(startMarker);
-  const end = source.indexOf('html += "</script></head><body><h1>Wavin Styring</h1>";');
+  const end = source.indexOf('html += "</script></head><body><h1>Wavin Styring</h1>');
 
   assert.notEqual(start, -1, 'script start marker should exist');
   assert.notEqual(end, -1, 'script end marker should exist');
@@ -40,42 +40,135 @@ function extractScript() {
     .join('');
 }
 
-function createElement(textContent = '') {
-  return {
+function createElement(registerElement, textContent = '') {
+  const element = {
     textContent,
     className: '',
     attributes: {},
+    style: {},
+    children: [],
+    parentNode: null,
+    appendChild(child) {
+      child.parentNode = this;
+      this.children.push(child);
+      return child;
+    },
+    insertBefore(child, referenceChild) {
+      child.parentNode = this;
+      if (!referenceChild) {
+        this.children.push(child);
+        return child;
+      }
+
+      const index = this.children.indexOf(referenceChild);
+      if (index === -1) {
+        this.children.push(child);
+        return child;
+      }
+
+      this.children.splice(index, 0, child);
+      return child;
+    },
     setAttribute(name, value) {
       this.attributes[name] = String(value);
+      if (name === 'id') {
+        this.id = String(value);
+      }
+      if (name === 'class') {
+        this.className = String(value);
+      }
     },
     getAttribute(name) {
+      if (name === 'id' && this.id) {
+        return this.id;
+      }
       return Object.prototype.hasOwnProperty.call(this.attributes, name) ? this.attributes[name] : null;
     },
   };
+
+  let elementId = '';
+  Object.defineProperty(element, 'id', {
+    get() {
+      return elementId;
+    },
+    set(value) {
+      elementId = String(value);
+      registerElement(elementId, element);
+    },
+  });
+
+  Object.defineProperty(element, 'innerHTML', {
+    get() {
+      return this._innerHTML || '';
+    },
+    set(value) {
+      this._innerHTML = String(value);
+      const tagPattern = /<([a-z]+)([^>]*)id='([^']+)'([^>]*)>([^<]*)</g;
+      let match;
+      while ((match = tagPattern.exec(this._innerHTML)) !== null) {
+        const [, , beforeIdAttributes, id, afterIdAttributes, text] = match;
+        const child = createElement(registerElement, text);
+        const attributes = `${beforeIdAttributes}${afterIdAttributes}`;
+        const classMatch = attributes.match(/class='([^']+)'/);
+        if (classMatch) {
+          child.className = classMatch[1];
+        }
+        const dataTargetMatch = attributes.match(/data-target-tenths='([^']+)'/);
+        if (dataTargetMatch) {
+          child.setAttribute('data-target-tenths', dataTargetMatch[1]);
+        }
+        child.id = id;
+      }
+    },
+  });
+
+  return element;
 }
 
-function createHarness() {
+function cloneItem(item) {
+  return { ...item };
+}
+
+function renderCardMarkup(item) {
+  const targetTenths = Math.round(Number(item.target) * 10);
+  return `<div class='row'><div class='col-left'><b id='name-${item.ch}'>${item.name}</b><br><span id='temp-${item.ch}'>${Number(item.temp).toFixed(1)}°C</span><div class='badges'><span class='badge ${item.heating ? 'badge-heat' : 'badge-off'}' id='heat-${item.ch}'>${item.heating ? '🔥 Varme' : 'Sluk'}</span><span class='badge badge-mode' id='mode-${item.ch}' onclick='toggleMode(${item.ch})' style='cursor:pointer'>${item.mode === 0 ? 'Manuel' : 'Standby'}</span></div></div><div class='col-right'><div class='battery'>Batteri: <span id='battery-${item.ch}'>${item.battery}%</span></div><div class='controls'><button class='btn' onclick='adjust(${item.ch},-5)'>-</button><span class='target' id='target-${item.ch}' data-target-tenths='${targetTenths}'>${Number(item.target).toFixed(1)}°C</span><button class='btn' onclick='adjust(${item.ch},5)'>+</button></div><div class='standby'>Standby: <span id='standby-${item.ch}'>${Number(item.standby).toFixed(1)}°C</span></div></div></div>`;
+}
+
+function createHarness(options = {}) {
   const timers = new Map();
   let nextTimerId = 1;
   const fetchCalls = [];
   const refreshRequests = [];
-  const serverState = { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 1' };
-  const target = createElement('21.0°C');
-  target.setAttribute('data-target-tenths', '210');
-  const elements = {
-    'target-0': target,
-    'temp-0': createElement('20.0°C'),
-    'name-0': createElement('Zone 1'),
-    'standby-0': createElement('18.0°C'),
-    'battery-0': createElement('90%'),
-    'heat-0': createElement('Sluk'),
-    'mode-0': createElement('Manuel'),
+  const defaultItems = [{ ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 1' }];
+  const initialItems = (options.initialItems || defaultItems).map(cloneItem);
+  let serverItems = (options.serverItems || initialItems).map(cloneItem);
+  const elements = {};
+  const registerElement = (id, element) => {
+    elements[id] = element;
+    return element;
   };
+  const container = createElement(registerElement);
+  container.id = 'channels';
+
+  function addCard(item) {
+    const card = createElement(registerElement);
+    card.className = 'card';
+    card.id = `card-${item.ch}`;
+    card.setAttribute('data-ch', String(item.ch));
+    card.innerHTML = renderCardMarkup(item);
+    container.appendChild(card);
+    return card;
+  }
+
+  initialItems.forEach(addCard);
 
   const context = {
     document: {
       getElementById(id) {
         return elements[id] || null;
+      },
+      createElement() {
+        return createElement(registerElement);
       },
     },
     fetch(url) {
@@ -84,16 +177,7 @@ function createHarness() {
         return Promise.resolve({
           json() {
             refreshRequests.push(url);
-            return Promise.resolve([{
-              ch: serverState.ch,
-              temp: serverState.temp,
-              target: serverState.target,
-              standby: serverState.standby,
-              battery: serverState.battery,
-              heating: serverState.heating,
-              mode: serverState.mode,
-              name: serverState.name,
-            }]);
+            return Promise.resolve(serverItems.map(cloneItem));
           },
         });
       }
@@ -132,9 +216,21 @@ function createHarness() {
   return {
     context,
     elements,
+    container,
     fetchCalls,
     refreshRequests,
-    serverState,
+    serverState: serverItems[0],
+    setServerItems(items) {
+      serverItems = items.map(cloneItem);
+      this.serverState = serverItems[0];
+    },
+    cardOrder() {
+      return container.children.map((child) => Number(child.getAttribute('data-ch')));
+    },
+    isCardVisible(ch) {
+      const card = elements[`card-${ch}`];
+      return !!card && card.style.display !== 'none';
+    },
     runActiveTimeouts(delay) {
       for (const [id, timer] of Array.from(timers.entries())) {
         if (!timer.cleared && timer.delay === delay) {
@@ -150,8 +246,9 @@ function createHarness() {
 }
 
 async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 4; i++) {
+    await Promise.resolve();
+  }
 }
 
 test('adjust uses 0.5°C steps without drift', () => {
@@ -279,4 +376,86 @@ test('refreshData clears pending mode once device confirms standby', async () =>
   harness.context.refreshData();
   await flushPromises();
   assert.equal(harness.elements['mode-0'].textContent, 'Standby');
+});
+
+test('refreshData inserts newly seen channels in channel order', async () => {
+  const harness = createHarness({
+    initialItems: [
+      { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 0' },
+      { ch: 2, temp: 22.0, target: 23.0, standby: 19.0, battery: 80, heating: true, mode: 1, name: 'Zone 2' },
+    ],
+  });
+
+  harness.setServerItems([
+    { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 0' },
+    { ch: 1, temp: 21.0, target: 22.0, standby: 18.5, battery: 85, heating: false, mode: 0, name: 'Zone 1' },
+    { ch: 2, temp: 22.0, target: 23.0, standby: 19.0, battery: 80, heating: true, mode: 1, name: 'Zone 2' },
+  ]);
+
+  harness.context.refreshData();
+  await flushPromises();
+
+  assert.deepEqual(harness.cardOrder(), [0, 1, 2]);
+  assert.equal(harness.elements['name-1'].textContent, 'Zone 1');
+});
+
+test('refreshData keeps cards visible through transient misses before hiding them', async () => {
+  const harness = createHarness({
+    initialItems: [
+      { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 0' },
+      { ch: 1, temp: 21.0, target: 22.0, standby: 19.0, battery: 80, heating: true, mode: 1, name: 'Zone 1' },
+    ],
+  });
+
+  harness.setServerItems([
+    { ch: 0, temp: 20.5, target: 21.5, standby: 18.0, battery: 88, heating: true, mode: 0, name: 'Zone 0' },
+  ]);
+
+  harness.context.refreshData();
+  await flushPromises();
+  assert.equal(harness.isCardVisible(1), true);
+
+  harness.context.refreshData();
+  await flushPromises();
+  assert.equal(harness.isCardVisible(1), true);
+
+  harness.context.refreshData();
+  await flushPromises();
+  assert.equal(harness.isCardVisible(1), false);
+});
+
+test('refreshData restores a hidden card in place when data returns', async () => {
+  const harness = createHarness({
+    initialItems: [
+      { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 0' },
+      { ch: 1, temp: 21.0, target: 22.0, standby: 19.0, battery: 80, heating: true, mode: 1, name: 'Zone 1' },
+      { ch: 2, temp: 22.0, target: 23.0, standby: 20.0, battery: 70, heating: false, mode: 0, name: 'Zone 2' },
+    ],
+  });
+
+  harness.setServerItems([
+    { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 0' },
+    { ch: 2, temp: 22.0, target: 23.0, standby: 20.0, battery: 70, heating: false, mode: 0, name: 'Zone 2' },
+  ]);
+
+  for (let i = 0; i < 3; i++) {
+    harness.context.refreshData();
+    await flushPromises();
+  }
+
+  assert.equal(harness.isCardVisible(1), false);
+
+  harness.setServerItems([
+    { ch: 0, temp: 20.0, target: 21.0, standby: 18.0, battery: 90, heating: false, mode: 0, name: 'Zone 0' },
+    { ch: 1, temp: 21.5, target: 22.5, standby: 19.5, battery: 82, heating: false, mode: 0, name: 'Zone 1 returned' },
+    { ch: 2, temp: 22.0, target: 23.0, standby: 20.0, battery: 70, heating: false, mode: 0, name: 'Zone 2' },
+  ]);
+
+  harness.context.refreshData();
+  await flushPromises();
+
+  assert.equal(harness.isCardVisible(1), true);
+  assert.deepEqual(harness.cardOrder(), [0, 1, 2]);
+  assert.equal(harness.elements['name-1'].textContent, 'Zone 1 returned');
+  assert.equal(harness.elements['target-1'].textContent, '22.5°C');
 });
