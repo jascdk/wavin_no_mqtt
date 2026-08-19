@@ -251,6 +251,15 @@ async function flushPromises() {
   }
 }
 
+test('battery status mapping treats 9 and above as fully charged', () => {
+  const batteryMappingFn = source.match(/int batteryStatusToPercent\(uint16_t status\) \{([\s\S]*?)\n\}/);
+
+  assert.notEqual(batteryMappingFn, null, 'battery status mapping function should exist');
+  assert.match(batteryMappingFn[1], /status >= 9/, 'battery mapping should treat 9 as fully charged');
+  assert.match(batteryMappingFn[1], /return 100;/, 'battery mapping should return 100 for full charge');
+  assert.match(batteryMappingFn[1], /return status \* 10;/, 'battery mapping should keep 10% units');
+});
+
 test('adjust uses 0.5°C steps without drift', () => {
   const harness = createHarness();
 
