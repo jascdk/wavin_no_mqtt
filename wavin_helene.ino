@@ -141,13 +141,14 @@ bool readChannelData(uint8_t ch, ChannelData &data) {
 void appendChannelCard(String &html, const ChannelData &data) {
   String channelId = String(data.ch);
 
-  html += "<div class='card'><div class='row'><div><b id='name-" + channelId + "'>" + htmlEscape(data.name) + "</b><br><span id='temp-" + channelId + "'>" + String(data.temp, 1) + "°C</span></div>";
+  html += "<div class='card'><div class='row'>";
+  html += "<div class='col-left'><b id='name-" + channelId + "'>" + htmlEscape(data.name) + "</b><br><span id='temp-" + channelId + "'>" + String(data.temp, 1) + "°C</span>";
   html += "<div class='badges'><span class='badge " + getHeatBadgeClass(data.heating) + "' id='heat-" + channelId + "'>" + getHeatLabel(data.heating) + "</span>";
-  html += "<span class='badge badge-mode' id='mode-" + channelId + "' onclick='toggleMode(" + channelId + ")' style='cursor:pointer'>" + getModeLabel(data.mode) + "</span></div>";
-  html += "<div class='battery'>Batteri: <span id='battery-" + channelId + "'>" + String(data.battery) + "%</span></div></div>";
+  html += "<span class='badge badge-mode' id='mode-" + channelId + "' onclick='toggleMode(" + channelId + ")' style='cursor:pointer'>" + getModeLabel(data.mode) + "</span></div></div>";
+  html += "<div class='col-right'><div class='battery'>Batteri: <span id='battery-" + channelId + "'>" + String(data.battery) + "%</span></div>";
   html += "<div class='controls'><button class='btn' onclick='adjust(" + channelId + ",-" + String(SETPOINT_STEP_TENTHS) + ")'>-</button>";
   html += "<span class='target' id='target-" + channelId + "' data-target-tenths='" + String((int)lroundf(data.target * 10.0f)) + "'>" + String(data.target, 1) + "°C</span>";
-  html += "<button class='btn' onclick='adjust(" + channelId + "," + String(SETPOINT_STEP_TENTHS) + ")'>+</button>";
+  html += "<button class='btn' onclick='adjust(" + channelId + "," + String(SETPOINT_STEP_TENTHS) + ")'>+</button></div>";
   html += "<div class='standby'>Standby: <span id='standby-" + channelId + "'>" + String(data.standby, 1) + "°C</span></div></div></div></div>";
 }
 
@@ -194,16 +195,19 @@ void handleRoot() {
   html = "<html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'><style>";
   html += "body { font-family: -apple-system, sans-serif; background: #f0f2f5; padding: 15px; }";
   html += ".card { background: white; border-radius: 12px; padding: 15px; margin-bottom: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }";
-  html += ".row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }";
-  html += ".controls { text-align: right; }";
+  html += ".row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }";
+  html += ".col-left { flex: 1; min-width: 0; }";
+  html += ".col-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }";
+  html += ".controls { display: flex; align-items: center; gap: 4px; }";
   html += ".btn { background: #007bff; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-size: 18px; cursor: pointer; }";
-  html += ".target { display: inline-block; margin: 0 15px; font-weight: bold; }";
-  html += ".badges { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }";
-  html += ".badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 0.8em; font-weight: 600; }";
+  html += ".target { display: inline-block; min-width: 60px; text-align: center; font-weight: bold; }";
+  html += ".badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }";
+  html += ".badge { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 0.78em; font-weight: 600; white-space: nowrap; }";
   html += ".badge-heat { background: #f8d7da; color: #b02a37; }";
   html += ".badge-off { background: #e9ecef; color: #6c757d; }";
   html += ".badge-mode { background: #dbeafe; color: #1d4ed8; }";
-  html += ".battery, .standby { font-size: 0.8em; color: #666; margin-top: 5px; }";
+  html += ".battery { font-size: 0.8em; color: #666; }";
+  html += ".standby { font-size: 0.8em; color: #666; text-align: right; }";
   html += ".footer { background: #dee2e6; padding: 15px; border-radius: 12px; font-size: 0.85em; color: #444; }";
   html += "</style><script>";
   html += "var SETPOINT_MIN_TENTHS = " + String(SETPOINT_MIN_TENTHS) + ";";
@@ -219,7 +223,7 @@ void handleRoot() {
   html += "function setTargetValue(ch, tenths) { var el = document.getElementById('target-' + ch); if (!el) return; el.textContent = formatTemp(tenths / 10); el.setAttribute('data-target-tenths', String(tenths)); }";
   html += "function getTargetTenths(ch) { var el = document.getElementById('target-' + ch); if (!el) return 0; var value = parseInt(el.getAttribute('data-target-tenths'), 10); if (isNaN(value)) { value = 0; } return value; }";
   html += "function updateBadge(id, text, className) { var el = document.getElementById(id); if (!el) return; el.textContent = text; el.className = 'badge ' + className; }";
-  html += "function insertChannelCard(item) { var ch = item.ch; var targetTenths = Math.round(parseFloat(String(item.target).replace('°C','')) * 10); var container = document.getElementById('channels'); if (!container) return; var div = document.createElement('div'); div.className = 'card'; div.innerHTML = \"<div class='row'><div><b id='name-\" + ch + \"'>\" + item.name + \"</b><br><span id='temp-\" + ch + \"'>\" + Number(item.temp).toFixed(1) + \"\\u00b0C</span></div><div class='badges'><span class='badge \" + (item.heating ? 'badge-heat' : 'badge-off') + \"' id='heat-\" + ch + \"'>\" + (item.heating ? '\\ud83d\\udd25 Varme' : 'Sluk') + \"</span><span class='badge badge-mode' id='mode-\" + ch + \"' onclick='toggleMode(\" + ch + \")' style='cursor:pointer'>\" + (item.mode === 0 ? 'Manuel' : 'Standby') + \"</span></div><div class='battery'>Batteri: <span id='battery-\" + ch + \"'>\" + item.battery + \"%</span></div></div><div class='controls'><button class='btn' onclick='adjust(\" + ch + \",-\" + SETPOINT_STEP_TENTHS + \")'>-</button><span class='target' id='target-\" + ch + \"' data-target-tenths='\" + targetTenths + \"'>\" + Number(item.target).toFixed(1) + \"\\u00b0C</span><button class='btn' onclick='adjust(\" + ch + \",\" + SETPOINT_STEP_TENTHS + \")'>+</button><div class='standby'>Standby: <span id='standby-\" + ch + \"'>\" + Number(item.standby).toFixed(1) + \"\\u00b0C</span></div></div>\"; container.appendChild(div); }";
+  html += "function insertChannelCard(item) { var ch = item.ch; var targetTenths = Math.round(parseFloat(String(item.target).replace('°C','')) * 10); var container = document.getElementById('channels'); if (!container) return; var div = document.createElement('div'); div.className = 'card'; div.innerHTML = \"<div class='row'><div class='col-left'><b id='name-\" + ch + \"'>\" + item.name + \"</b><br><span id='temp-\" + ch + \"'>\" + Number(item.temp).toFixed(1) + \"\\u00b0C</span><div class='badges'><span class='badge \" + (item.heating ? 'badge-heat' : 'badge-off') + \"' id='heat-\" + ch + \"'>\" + (item.heating ? '\\ud83d\\udd25 Varme' : 'Sluk') + \"</span><span class='badge badge-mode' id='mode-\" + ch + \"' onclick='toggleMode(\" + ch + \")' style='cursor:pointer'>\" + (item.mode === 0 ? 'Manuel' : 'Standby') + \"</span></div></div><div class='col-right'><div class='battery'>Batteri: <span id='battery-\" + ch + \"'>\" + item.battery + \"%</span></div><div class='controls'><button class='btn' onclick='adjust(\" + ch + \",-\" + SETPOINT_STEP_TENTHS + \")'>-</button><span class='target' id='target-\" + ch + \"' data-target-tenths='\" + targetTenths + \"'>\" + Number(item.target).toFixed(1) + \"\\u00b0C</span><button class='btn' onclick='adjust(\" + ch + \",\" + SETPOINT_STEP_TENTHS + \")'>+</button></div><div class='standby'>Standby: <span id='standby-\" + ch + \"'>\" + Number(item.standby).toFixed(1) + \"\\u00b0C</span></div></div></div>\"; container.appendChild(div); }";
   html += "function refreshData() { fetch('/data').then(function(response) { return response.json(); }).then(function(items) { var activeChs = {}; items.forEach(function(item) { activeChs[item.ch] = true; var temp = document.getElementById('temp-' + item.ch); if (!temp) { insertChannelCard(item); return; } temp.textContent = formatTemp(item.temp); var name = document.getElementById('name-' + item.ch); if (name) name.textContent = item.name; var targetTenths = parseTempTenths(item.target); if (Object.prototype.hasOwnProperty.call(pendingSetpoints, item.ch)) { if (targetTenths === pendingSetpoints[item.ch] && !pendingSetpointTimers[item.ch]) { delete pendingSetpoints[item.ch]; } else { targetTenths = pendingSetpoints[item.ch]; } } else { setTargetValue(item.ch, targetTenths); } var standby = document.getElementById('standby-' + item.ch); if (standby) standby.textContent = formatTemp(item.standby); var battery = document.getElementById('battery-' + item.ch); if (battery) battery.textContent = item.battery + '%'; updateBadge('heat-' + item.ch, item.heating ? '🔥 Varme' : 'Sluk', item.heating ? 'badge-heat' : 'badge-off'); var modeVal = item.mode; if (Object.prototype.hasOwnProperty.call(pendingModes, item.ch)) { if (modeVal === pendingModes[item.ch]) { delete pendingModes[item.ch]; } else { modeVal = pendingModes[item.ch]; } } updateBadge('mode-' + item.ch, modeVal === 0 ? 'Manuel' : 'Standby', 'badge-mode'); }); Object.keys(pendingSetpoints).forEach(function(ch) { if (!activeChs[ch]) { delete pendingSetpoints[ch]; if (pendingSetpointTimers[ch]) { clearTimeout(pendingSetpointTimers[ch]); delete pendingSetpointTimers[ch]; } } }); Object.keys(pendingModes).forEach(function(ch) { if (!activeChs[ch]) { delete pendingModes[ch]; } }); }).catch(function() {}); }";
   html += "function pushSetpoint(ch, tenths) { fetch('/set?ch=' + ch + '&val=' + (tenths / 10).toFixed(1)).then(function(response) { if (!response.ok) { throw new Error('setpoint'); } setTimeout(refreshData, 300); }).catch(function() { setTargetValue(ch, getTargetTenths(ch)); }); }";
   html += "function queueSetpointPush(ch) { if (pendingSetpointTimers[ch]) clearTimeout(pendingSetpointTimers[ch]); pendingSetpointTimers[ch] = setTimeout(function() { delete pendingSetpointTimers[ch]; pushSetpoint(ch, pendingSetpoints[ch]); }, SETPOINT_DEBOUNCE_MS); }";
