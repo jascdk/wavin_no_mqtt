@@ -141,7 +141,7 @@ bool readChannelData(uint8_t ch, ChannelData &data) {
 void appendChannelCard(String &html, const ChannelData &data) {
   String channelId = String(data.ch);
 
-  html += "<div class='card'><div class='row'><div><b id='name-" + channelId + "'>" + htmlEscape(data.name) + "</b><br><span id='temp-" + channelId + "'>" + String(data.temp, 1) + "°C</span>";
+  html += "<div class='card' data-channel='" + channelId + "'><div class='row'><div><b id='name-" + channelId + "'>" + htmlEscape(data.name) + "</b><br><span id='temp-" + channelId + "'>" + String(data.temp, 1) + "°C</span>";
   html += "<div class='badges'><span class='badge " + getHeatBadgeClass(data.heating) + "' id='heat-" + channelId + "'>" + getHeatLabel(data.heating) + "</span>";
   html += "<span class='badge badge-mode' id='mode-" + channelId + "' onclick='toggleMode(" + channelId + ")' style='cursor:pointer'>" + getModeLabel(data.mode) + "</span></div>";
   html += "<div class='battery'>Batteri: <span id='battery-" + channelId + "'>" + String(data.battery) + "%</span></div></div>";
@@ -218,7 +218,7 @@ void handleRoot() {
   html += "function setTargetValue(ch, tenths) { var el = document.getElementById('target-' + ch); if (!el) return; el.textContent = formatTemp(tenths / 10); el.setAttribute('data-target-tenths', String(tenths)); }";
   html += "function getTargetTenths(ch) { var el = document.getElementById('target-' + ch); if (!el) return 0; var value = parseInt(el.getAttribute('data-target-tenths'), 10); if (isNaN(value)) { value = parseTempTenths(el.textContent); el.setAttribute('data-target-tenths', String(value)); } return value; }";
   html += "function updateBadge(id, text, className) { var el = document.getElementById(id); if (!el) return; el.textContent = text; el.className = 'badge ' + className; }";
-  html += "function refreshData() { fetch('/data').then(function(response) { return response.json(); }).then(function(items) { items.forEach(function(item) {";
+  html += "function refreshData() { fetch('/data').then(function(response) { return response.json(); }).then(function(items) { var activeChannels = {}; items.forEach(function(item) { activeChannels[item.ch] = true; }); document.querySelectorAll('.card[data-channel]').forEach(function(card) { var ch = parseInt(card.getAttribute('data-channel'), 10); if (!activeChannels[ch]) { card.remove(); delete pendingSetpoints[ch]; if (pendingSetpointTimers[ch]) { clearTimeout(pendingSetpointTimers[ch]); delete pendingSetpointTimers[ch]; } delete pendingModes[ch]; } }); items.forEach(function(item) {";
   html += "var temp = document.getElementById('temp-' + item.ch); if (temp) temp.textContent = formatTemp(item.temp);";
   html += "var name = document.getElementById('name-' + item.ch); if (name) name.textContent = item.name;";
   html += "var targetTenths = parseTempTenths(item.target); if (Object.prototype.hasOwnProperty.call(pendingSetpoints, item.ch)) { if (targetTenths === pendingSetpoints[item.ch] && !pendingSetpointTimers[item.ch]) { delete pendingSetpoints[item.ch]; } else { targetTenths = pendingSetpoints[item.ch]; } } setTargetValue(item.ch, targetTenths);";
