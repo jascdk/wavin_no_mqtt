@@ -99,6 +99,14 @@ int clampSetpointTenths(int value) {
   return value;
 }
 
+int batteryStatusToPercent(uint16_t status) {
+  if (status >= 9) {
+    return 100;
+  }
+
+  return status * 10;
+}
+
 bool readChannelData(uint8_t ch, ChannelData &data) {
   uint16_t primaryReg[1];
   data.active = false;
@@ -131,7 +139,7 @@ bool readChannelData(uint8_t ch, ChannelData &data) {
   data.temp = elementReg[WavinController::ELEMENTS_AIR_TEMPERATURE] / 10.0;
   data.target = targetReg[0] / 10.0;
   data.standby = standbyReg[0] / 10.0;
-  data.battery = elementReg[WavinController::ELEMENTS_BATTERY_STATUS] * 10;
+  data.battery = batteryStatusToPercent(elementReg[WavinController::ELEMENTS_BATTERY_STATUS]);
   data.heating = (timerReg[0] & WavinController::CHANNELS_TIMER_EVENT_OUTP_ON_MASK) != 0;
   data.mode = configReg[0] & WavinController::PACKED_DATA_CONFIGURATION_MODE_MASK;
   data.active = true;
